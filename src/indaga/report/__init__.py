@@ -1,5 +1,5 @@
 """
-report_kit — shared design system for HeathProject HTML reports.
+report_kit — shared design system for Indaga HTML reports.
 
 Public surface:
     from report_kit import build_report, RefCollector, components as C, charts, i18n

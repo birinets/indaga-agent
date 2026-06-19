@@ -5,7 +5,7 @@ Indaga's own "extend" stage: raw chip (GRCh37) → imputed GRCh38 genome
 (the privacy moat; TOPMed-grade needs a server upload and is off this path).
 
 Engine: Beagle 5.5 (GPL). Panel: 1000G-30x GRCh38 phased (3,202 genomes, NYGC) —
-GRCh38-native, a clear upgrade over HeathProject's GRCh37 1000G-phase3. (HGDP+1kGP,
+GRCh38-native, a clear upgrade over the older GRCh37 1000G-phase3. (HGDP+1kGP,
 more diverse, is a future upgrade with no ready phased release.)
 
 Alignment: the panel is keyed by GRCh38 ``chrom:pos:ref:alt`` (no rsIDs), so the chip

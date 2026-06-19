@@ -1,4 +1,4 @@
-"""High-penetrance P/LP screen (ported from HeathProject pipeline/_pl_screen_core.py).
+"""High-penetrance P/LP screen.
 
 Finds the ClinVar Pathogenic/Likely-pathogenic variants the subject CARRIES
 (genome-wide), then applies the honest gnomAD allele-frequency refutation: a
@@ -6,7 +6,7 @@ Finds the ClinVar Pathogenic/Likely-pathogenic variants the subject CARRIES
 false alarm, not a real high-penetrance risk. Priority-panel membership is an
 annotation, not a filter (ESR1's panel='—' is genome-wide).
 
-Identical science to HeathProject; the only changes are (a) candidates come from
+Standard P/LP carrier-screening science; here (a) candidates come from
 Indaga's own ClinVar evidence store via a ClinVar⋈AGI carrier join, and (b) the
 gnomAD lookup is GRCh37 (gnomad_r2_1) to match the chip's build. No pandas.
 """
@@ -94,7 +94,7 @@ def _review_stars(review: str | None) -> int:
 
 
 def _classify(af, error) -> str:
-    """Verbatim from HeathProject: error → api_error; no AF → not_in_gnomad;
+    """gnomAD-refutation classification: error → api_error; no AF → not_in_gnomad;
     <1% → confirmed_rare; else common_likely_false_alarm."""
     if error:
         return "api_error"

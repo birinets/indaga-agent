@@ -1,4 +1,4 @@
-"""Genome annotation orchestrator — Indaga's own pipeline, no HeathProject outputs.
+"""Genome annotation orchestrator — Indaga's own self-contained pipeline.
 
 Given a subject's Active Genome Index (built from their imputed GRCh38 genome, or a
 raw chip as fallback), this:
@@ -8,7 +8,7 @@ raw chip as fallback), this:
   4. materializes both into the subject's evidence.sqlite and marks annotation complete.
 
 Idempotent: re-running with an unchanged AGI is a no-op (the AGI signature is stored).
-This replaces the dependency on HeathProject's pre-computed OpenCRAVAT/PGS outputs.
+It computes its own OpenCRAVAT/PGS-equivalent annotations on-device — no external pipeline dependency.
 """
 
 from __future__ import annotations

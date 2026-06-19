@@ -1,5 +1,5 @@
 """
-Shared visual design system for HeathProject HTML reports.
+Shared visual design system for Indaga HTML reports.
 
 One source of truth for the look of every report. The CSS uses CSS custom
 properties (variables) so the same component classes render in dark or light
@@ -24,7 +24,7 @@ TIER_COLORS = {
 
 BASE_CSS = """
 /* ============================================================= *
- *  HeathProject report design system — dark (default) + light   *
+ *  Indaga report design system — dark (default) + light         *
  * ============================================================= */
 :root {
   --bg: #0f1117;

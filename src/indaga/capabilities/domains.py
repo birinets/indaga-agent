@@ -1,6 +1,6 @@
 """Domains capability — surface the pre-computed domain panels (genome lenses).
 
-HeathProject curated a gene panel per wellness domain (06b) and produced a bundle
+Indaga curates a gene panel per wellness domain and produces a bundle
 per domain with the user's annotated variants in those genes + the relevant labs +
 recommended missing tests. Rather than re-author panels, Indaga surfaces these
 validated bundles as ~15 genome-domain lenses (methylation, hormones, immunity,

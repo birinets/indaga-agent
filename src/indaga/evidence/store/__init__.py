@@ -3,7 +3,7 @@
 A shared ClinVar/gnomAD reference DB (``~/.indaga/shared-evidence.sqlite``) +
 per-subject materialized findings (``~/.indaga/<subject>/evidence.sqlite``),
 ATTACH-blended for reads. This is the genome-engine-internal artifact that
-replaces the dependency on HeathProject's pre-computed OpenCRAVAT outputs.
+is computed on-device, with no external pre-computed OpenCRAVAT dependency.
 """
 
 from .clinvar_import import import_clinvar_vcf

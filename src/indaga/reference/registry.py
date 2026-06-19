@@ -267,7 +267,7 @@ _SPECS: tuple[LibrarySpec, ...] = (
         required_paths=(_p("resources", "fasta", "hg38.fa.bgz"),),
     ),
 
-    # ===== Phase D — remaining HeathProject reads brought in-house ===========
+    # ===== Phase D — remaining external-pipeline reads brought in-house ======
     LibrarySpec(
         id="pharmcat-pipeline", title="PharmCAT pipeline (jar + preprocessor + positions)",
         helps="star-allele diplotypes + CPIC pharmacogenomics on the imputed genome",
@@ -330,7 +330,7 @@ _SPECS: tuple[LibrarySpec, ...] = (
     LibrarySpec(
         id="impute-panel-1000g-30x", title="1000G 30x GRCh38 phased imputation panel (per-chromosome)",
         helps="the reference haplotypes Beagle imputes against — 3,202 genomes at 30×, NATIVE GRCh38, "
-              "pre-phased (NYGC 20220422). A clear upgrade over HeathProject's GRCh37 1000G-phase3: "
+              "pre-phased (NYGC 20220422). A clear upgrade over the older GRCh37 1000G-phase3: "
               "GRCh38-native (no liftover-back) + more samples. (HGDP+1kGP, ~4,096 + more diverse, is a "
               "future upgrade — it has no ready phased release and must be assembled from gnomAD VCFs.)",
         kind=Kind.PARAMETERIZED, size_class="~9 GB (all chr; ~445 MB/chr)", purposes=("imputation",), phase="A",

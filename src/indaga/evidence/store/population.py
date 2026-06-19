@@ -1,4 +1,4 @@
-"""gnomAD population-frequency client (ported from HeathProject _pl_screen_core.py).
+"""gnomAD population-frequency client.
 
 Live GraphQL against gnomAD r4 (GRCh38), with a persistent JSON cache under
 ``~/.indaga/gnomad_cache.json`` so a re-run is offline for already-seen variants.

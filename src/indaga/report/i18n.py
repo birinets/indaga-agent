@@ -1,5 +1,5 @@
 """
-UI-chrome internationalisation for HeathProject HTML reports.
+UI-chrome internationalisation for Indaga HTML reports.
 
 Scope (per the v1 decision): only the *interface chrome* is translated —
 navigation, section titles, table headers, KPI labels, units, status words,
@@ -468,7 +468,7 @@ def js_catalog() -> str:
 
 
 # -- Indaga additions: keys the `analyze` report sections need that the upstream --
-#    HeathProject catalog didn't define. Merged into UI so t()/js_catalog see them.
+#    the base catalog didn't define. Merged into UI so t()/js_catalog see them.
 _INDAGA_EXT = {
     "en": {
         "sec_genome": "Genome Overview", "sec_pgs": "Polygenic Scores",

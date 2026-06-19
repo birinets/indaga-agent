@@ -19,17 +19,18 @@ machine; raw data never leaves it. The server exposes a small **base tool set** 
 ## 1. Get the code
 
 ```bash
-git clone <indaga-agent repo> Indaga-agent     # or copy the folder
-# optional editable install (adds the `indaga` command):
-pip install -e Indaga-agent
+git clone https://github.com/birinets/indaga-agent.git && cd indaga-agent
+# editable install (adds the `indaga` command). uv is sudo-free and recommended:
+uv venv .venv && uv pip install --python .venv/bin/python -e .
+#   …or plain pip inside your own venv:  pip install -e .
 ```
 
-Running from source (no install) is fully supported — set `PYTHONPATH` to `Indaga-agent/src`.
+Running from source (no install) is fully supported — from the repo root, set `PYTHONPATH` to `src`.
 
 ## 2. Smoke-test before wiring a host
 
 ```bash
-PYTHONPATH=Indaga-agent/src python3 -m indaga.interfaces.cli selftest \
+PYTHONPATH=src python3 -m indaga.interfaces.cli selftest \
   --subject <subject> --user-dir <abs path to the user's data dir>
 ```
 
@@ -53,7 +54,7 @@ merge into `mcpServers`, do not overwrite the file:
                "--subject", "<subject>",
                "--user-dir", "/ABSOLUTE/path/to/user/data",
                "--hr-limit", "20000"],
-      "env": { "PYTHONPATH": "/ABSOLUTE/path/to/Indaga-agent/src" }
+      "env": { "PYTHONPATH": "/ABSOLUTE/path/to/indaga-agent/src" }
     }
   }
 }
@@ -113,5 +114,5 @@ existing entries; an existing Hermes `config.yaml` is left untouched with the sn
 
 ## 5. Updating
 
-Pull the repo (`git -C Indaga-agent pull --ff-only`) and restart the host. The persistent index is
+Pull the repo (`git pull --ff-only` from the repo root) and restart the host. The persistent index is
 rebuilt automatically when its source data changes (or pass `--rebuild`).

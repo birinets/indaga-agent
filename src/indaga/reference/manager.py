@@ -2,7 +2,7 @@
 
 The single code path that materializes reference libraries under ``indaga_home()``
 and reports what is installed. "Full download always": references are fetched
-into ``~/.indaga/`` (never silently borrowed from ``~/.genomi`` or HeathProject)
+into ``~/.indaga/`` (never silently borrowed from another project's data home)
 so Indaga is genuinely standalone. Idempotent — an installed library is not
 re-fetched unless ``force=True``.
 

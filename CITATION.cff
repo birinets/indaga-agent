@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use Indaga-agent, please cite it using the metadata in this file."
+title: "Indaga-agent"
+type: software
+authors:
+  - name: "birinets"
+abstract: >-
+  Local-first, multi-omic personal-health agent runtime (MCP): turns a consumer
+  DNA chip and other health data into a queryable, honest expert — chip to
+  imputation to annotation, behind one evidence-envelope honesty contract. Runs
+  fully on-device; no personal data leaves the machine.
+version: "0.1.0"
+date-released: "2026-06-19"
+license: "AGPL-3.0-or-later"
+repository-code: "https://github.com/birinets/indaga-agent"
+keywords:
+  - genomics
+  - multi-omic
+  - personal health
+  - MCP
+  - local-first
+  - evidence grounding
+  - imputation
+  - pharmacogenomics
+  - polygenic scores

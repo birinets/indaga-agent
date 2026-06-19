@@ -22,7 +22,7 @@ mutating: false
 Grounding adds the biological *context* around a finding — the layer that turns "you carry rs7903146"
 into "rs7903146 sits in an intron of TCF7L2, a Wnt-signalling transcription factor in pancreatic β-cells".
 Unlike a genome-only lookup, it is **fully local**: every answer comes from downloaded reference data, so
-no third party learns which gene/locus the subject asked about (`externalIO` is empty).
+no third party learns which gene/locus the subject asked about (`external_io` is empty).
 
 Every reference is **downloaded** (read-only — grounding never auto-installs; if a library is missing the tool
 returns `not_measured` with the `indaga install …` hint). Gene names are **entity-canonicalised** to the

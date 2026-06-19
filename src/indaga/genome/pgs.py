@@ -1,9 +1,9 @@
-"""Polygenic score computation (ported from HeathProject pipeline/05_pgs_compute.py).
+"""Polygenic score computation.
 
 For each curated PGS Catalog score: parse the harmonized GRCh38 weight file, match
 the subject's genotypes by position, sum effect-allele dosage × weight, and turn the
 raw score into a population percentile analytically (μ = Σ2pβ, σ² = Σ2p(1-p)β², then
-z → normal CDF). Identical math to HeathProject; the only change is that genotypes
+z → normal CDF) — standard analytic PGS percentile math; genotypes
 come from Indaga's own AGI (allele-based effect dosage) and weights from the
 downloaded ``pgs-weights`` library. stdlib only (math.erf for the CDF; no scipy).
 """
@@ -15,8 +15,8 @@ import math
 
 from ..reference import manager as refmgr
 
-# Curated PGS list (pgs_id, category, trait_label, direction, note) — verbatim from
-# HeathProject's PGS_CATALOG (microarray-friendly, trait labels verified vs PGS Catalog).
+# Curated PGS list (pgs_id, category, trait_label, direction, note): microarray-friendly,
+# trait labels verified against the PGS Catalog.
 PGS_CATALOG: list[tuple[str, str, str, str, str]] = [
     ("PGS000010", "Cardiometabolic", "Coronary heart disease (GRS27)", "high=more risk", "Mega 2015 — 27-SNP"),
     ("PGS000011", "Cardiometabolic", "Coronary artery disease (GRS50)", "high=more risk", "Khera 2016 — 50-SNP"),
@@ -71,8 +71,8 @@ def revcomp(a: str) -> str:
 
 
 def parse_scoring_file(path: str):
-    """Yield (chrom, pos, effect_allele, other_allele, weight, af, rsid) — verbatim
-    column resolution from HeathProject (hm_chr/chr_name, hm_pos/chr_position, …)."""
+    """Yield (chrom, pos, effect_allele, other_allele, weight, af, rsid) with robust
+    column resolution (hm_chr/chr_name, hm_pos/chr_position, …)."""
     with gzip.open(path, "rt") as f:
         header = None
         for line in f:
