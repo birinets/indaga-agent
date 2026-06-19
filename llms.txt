@@ -1,0 +1,45 @@
+# Indaga-agent
+
+> Local-first, multi-omic personal-health agent runtime. One persistent Active Health Index, one
+> evidence-envelope honesty contract, one dispatcher + per-capability skills — across genome, labs,
+> wearables, CGM, and derived metrics. The agent backend for the Indaga product.
+
+## Core rules
+
+- For install/setup, read INSTALL_FOR_AGENTS.md first and follow it.
+- Base tools (`indaga.*` + each capability's entry tool) appear in MCP `tools/list` directly.
+  Every other tool is reached via `indaga.invoke({"tool": "<name>", "params": {...}})` after reading
+  the capability's `skills/<capability>/SKILL.md`.
+- Every result carries an `evidence_envelope`. Read it and answer at exactly its strength.
+  `finding_state` ∈ {evidence_present, not_observed_in_consulted_scope, not_measured, not_assessed,
+  blocked_missing_library, index_incomplete, true_negative_supported}.
+- ABSENCE IS NEVER "NORMAL". `negative_inference.allowed` is almost always false. `not_measured`
+  (lab never drawn / sensor stale) and `index_incomplete` (metric still calibrating) mean UNKNOWN.
+- Derive confidence dynamically from the envelope (grade, coverage, caveats) — never a static default.
+- n=1: every query is hard-scoped to one subject. Indaga-agent is wellness decision-support, not diagnosis.
+
+## Documentation
+
+- INSTALL_FOR_AGENTS.md — install + MCP host wiring (start here for setup).
+- skills/SKILL.md — the root skill: routing + the honesty contract (the agent's operating rules).
+- README.md — what it is + repo layout. AGENTS.md — how to develop it.
+
+## Capabilities (read the SKILL.md before invoking focused tools)
+
+- skills/genome/SKILL.md — DNA from the imputed Active Genome Index: genotype + callability, ClinVar, P/LP screen, computed ACMG/AMP, polygenic scores, in-house PharmCAT PGx, GWAS-Catalog associations, continental ancestry.
+- skills/domains/SKILL.md — genome-domain lenses (methylation, hormones, immunity, gut, skin, sleep, longevity, athletic, …).
+- skills/nutrigenomics/SKILL.md — interpreted food/nutrient genetics (lactose, caffeine, alcohol, MTHFR, iron, taste).
+- skills/circadian/SKILL.md — Biological Clock / Biological Midnight (HR-nadir cosinor; 14-night gating).
+- skills/labs/SKILL.md — lab analytes + panel coverage (measurement-present: never-measured ≠ normal).
+- skills/metabolic/SKILL.md — CGM glycemic summary (freshness: stale data ≠ current control).
+- skills/health-index/SKILL.md — general facts / timeseries / context-pack / provenance / sources / corrections.
+
+## Discovery tools (base)
+
+- `indaga.list_capabilities` — capabilities, their tools, and skill paths.
+- `indaga.read_skill({"capability": "<cap>"})` — fetch a SKILL.md for progressive disclosure.
+- `indaga.describe_context` — the subject's connected sources + fact count + capabilities.
+
+## Single-fetch
+
+For a no-navigation context dump, fetch llms-full.txt (this file + the root and capability skills inlined).

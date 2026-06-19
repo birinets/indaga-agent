@@ -1,0 +1,798 @@
+# Indaga-agent
+
+> Local-first, multi-omic personal-health agent runtime. One persistent Active Health Index, one
+> evidence-envelope honesty contract, one dispatcher + per-capability skills — across genome, labs,
+> wearables, CGM, and derived metrics. The agent backend for the Indaga product.
+
+## Core rules
+
+- For install/setup, read INSTALL_FOR_AGENTS.md first and follow it.
+- Base tools (`indaga.*` + each capability's entry tool) appear in MCP `tools/list` directly.
+  Every other tool is reached via `indaga.invoke({"tool": "<name>", "params": {...}})` after reading
+  the capability's `skills/<capability>/SKILL.md`.
+- Every result carries an `evidence_envelope`. Read it and answer at exactly its strength.
+  `finding_state` ∈ {evidence_present, not_observed_in_consulted_scope, not_measured, not_assessed,
+  blocked_missing_library, index_incomplete, true_negative_supported}.
+- ABSENCE IS NEVER "NORMAL". `negative_inference.allowed` is almost always false. `not_measured`
+  (lab never drawn / sensor stale) and `index_incomplete` (metric still calibrating) mean UNKNOWN.
+- Derive confidence dynamically from the envelope (grade, coverage, caveats) — never a static default.
+- n=1: every query is hard-scoped to one subject. Indaga-agent is wellness decision-support, not diagnosis.
+
+## Documentation
+
+- INSTALL_FOR_AGENTS.md — install + MCP host wiring (start here for setup).
+- skills/SKILL.md — the root skill: routing + the honesty contract (the agent's operating rules).
+- README.md — what it is + repo layout. AGENTS.md — how to develop it.
+
+## Capabilities (read the SKILL.md before invoking focused tools)
+
+- skills/genome/SKILL.md — DNA from the imputed Active Genome Index: genotype + callability, ClinVar, P/LP screen, computed ACMG/AMP, polygenic scores, in-house PharmCAT PGx, GWAS-Catalog associations, continental ancestry.
+- skills/domains/SKILL.md — genome-domain lenses (methylation, hormones, immunity, gut, skin, sleep, longevity, athletic, …).
+- skills/nutrigenomics/SKILL.md — interpreted food/nutrient genetics (lactose, caffeine, alcohol, MTHFR, iron, taste).
+- skills/circadian/SKILL.md — Biological Clock / Biological Midnight (HR-nadir cosinor; 14-night gating).
+- skills/labs/SKILL.md — lab analytes + panel coverage (measurement-present: never-measured ≠ normal).
+- skills/metabolic/SKILL.md — CGM glycemic summary (freshness: stale data ≠ current control).
+- skills/health-index/SKILL.md — general facts / timeseries / context-pack / provenance / sources / corrections.
+
+## Discovery tools (base)
+
+- `indaga.list_capabilities` — capabilities, their tools, and skill paths.
+- `indaga.read_skill({"capability": "<cap>"})` — fetch a SKILL.md for progressive disclosure.
+- `indaga.describe_context` — the subject's connected sources + fact count + capabilities.
+
+## Single-fetch
+
+For a no-navigation context dump, fetch llms-full.txt (this file + the root and capability skills inlined).
+
+
+================================================================
+FILE: skills/SKILL.md
+================================================================
+
+---
+name: indaga
+description: Use this skill for personal multi-omic health questions — circadian/Biological Midnight, labs, glucose/CGM, wearable trends, and the synthesis across them. Indaga answers from the user's own Active Health Index, never from generic knowledge, and is honest about what it can and cannot claim.
+---
+
+# Indaga
+
+Indaga is a local-first, multi-omic personal-health runtime. It answers questions
+about ONE person's own data — genome (later), labs, wearables, CGM, and the derived
+metrics built from them — by querying their persistent **Active Health Index**, and
+it reports exactly how strong each answer is through a single **evidence envelope**.
+
+It is the multi-omic sibling of a genome agent: the same three spines (a persistent
+per-subject index, one honesty contract, a dispatcher + per-capability skills), but
+across every modality instead of DNA alone.
+
+## How to call Indaga
+
+Call through the MCP server: `mcp__indaga-healthlake__<operation>` (or your host's
+equivalent namespace). `tools/list` shows only the **base set**; every other tool is
+reached through the `indaga.invoke` dispatcher after you load the matching capability skill.
+
+## Core rules (the honesty contract)
+
+Every Indaga result carries an `evidence_envelope`. **Read it before you answer.** It
+is the single source of truth for what the result can support — there is no parallel
+policy in prose.
+
+- `finding_state` + `answer_readiness` tell you the strength:
+  - `evidence_present` / `answer_supported` → you may state the finding (cite the fact).
+  - `evidence_present` / `scoped_answer_only` → answer, but only within the stated scope.
+  - `index_incomplete` / `needs_more_data` → the metric is still **calibrating** (e.g. a
+    Biological Midnight before 14 valid nights). Do NOT state the value; explain it's calibrating.
+  - `not_measured` / `needs_more_data` → the analyte/metric was never collected, or the
+    sensor data is **stale**. **Absence here is UNKNOWN, never "normal".** Do not say "your X is fine".
+  - `not_observed_in_consulted_scope` → nothing matched in scope; do not imply a clinical negative.
+  - `not_assessed` / `cannot_answer_yet` → could not assess; request inputs or use another tool.
+- **`negative_inference.allowed` is almost always `false`.** Only state "you don't have X" /
+  "your X is normal" when an envelope explicitly allows negative inference. Zero results ≠ a negative.
+- **Derive confidence dynamically** from the envelope (grade, coverage, caveats) — never a
+  static default. Mention personal data use only when it materially shapes the answer.
+- **n=1, always.** Every query is hard-scoped to the one subject; never mix people's data.
+- Indaga is wellness decision-support, not diagnosis. Keep clinical language informational and
+  recommend clinician review for medical decisions.
+
+## Routing
+
+`tools/list` returns only the base set:
+- `indaga.*` (always direct-callable): `indaga.invoke`, `indaga.describe_context`,
+  `indaga.list_capabilities`, `indaga.read_skill`, `indaga.install` (fetch reference libraries),
+  `indaga.check_libraries` (what's installed), `indaga.check_background_job` (poll long jobs).
+- each capability's **entry tool** (e.g. `clock.state`, `facts.query`, `labs.query`,
+  `cgm.glycemic_summary`, `sources.list`, `context_pack.get`).
+
+To use a non-base (focused) tool, load its capability skill, then call:
+
+```
+indaga.invoke({"tool": "<operation_name>", "params": {...}})
+```
+
+Discover capabilities + their skill paths with `indaga.list_capabilities`; fetch a skill's
+markdown with `indaga.read_skill({"capability": "circadian"})`. Then call the smallest useful
+tool, read its envelope, and continue until the answer is supported.
+
+## Capabilities
+
+- **genome** — DNA from the subject's own imputed genome: genotype + callability, ClinVar, P/LP screen (carrier/confidence-tiered), polygenic scores, **in-house PharmCAT PGx** (`pgx.summary` after `genome.pgx_run`), **GWAS-Catalog associations** (`gwas.associations`), **continental ancestry** (`ancestry.estimate`), and a **computed ACMG/AMP classification** (`acmg.classify`). Run the pipeline with `genome.impute` (background) → `genome.annotate`. `skills/genome/SKILL.md`
+- **domains** — genome-domain lenses (methylation, hormones, immunity, gut, skin, sleep, longevity, athletic, …). `skills/domains/SKILL.md`
+- **nutrigenomics** — interpreted food/nutrient genetics (lactose, caffeine, alcohol, MTHFR, iron, taste). `skills/nutrigenomics/SKILL.md`
+- **circadian** — the Biological Clock / Biological Midnight (HR-nadir cosinor). `skills/circadian/SKILL.md`
+- **labs** — lab analytes + panel coverage (measurement-present honesty). `skills/labs/SKILL.md`
+- **metabolic** — CGM glycemic summary (freshness honesty). `skills/metabolic/SKILL.md`
+- **health-index** — general facts / timeseries / context-pack / provenance / sources / corrections. `skills/health-index/SKILL.md`
+- **synthesis** — fuse DNA × labs × PGS × CGM for a topic into one grounded answer (the multi-omic edge). `skills/synthesis/SKILL.md`
+- **analyze** — the user's WHOLE multi-omic picture in one place: `analyze.report` (structured, evidence-graded sections) + `analyze.export` (a self-contained, offline `report.html`). Read-only; every section carries its honesty grade and degrades gracefully. `skills/analyze/SKILL.md`
+- *(later: journal)*
+
+## Multi-stream synthesis
+
+When several capabilities can contribute orthogonal evidence to one question (e.g. glucose ×
+genotype × recent sleep), combine them. A scope-limited single-capability result
+(`not_measured`, `index_incomplete`, stale) is not a final answer when another capability can
+still contribute — but never paper over a genuine gap; report it honestly.
+
+## Answering
+
+Lead with the answer. Name the data behind it when it materially shapes the result (the lab
+draw, the wearable series, the date range). Pair every capability with its limit and every
+number with its uncertainty. The honesty *is* the product.
+
+**Two conventions govern every answer — read both:**
+- `skills/conventions/evidence-envelope.md` — what an answer may *claim* (the data contract).
+- `skills/output-rules.md` — how to *render* it (the delivery contract): lead with meaning;
+  a predictor score (`am_class`/REVEL/SpliceAI/PGS) is never a diagnosis; exact-allele match before
+  you alarm; translate `DR2`/typed-vs-imputed/ClinVar into plain terms; absence is per-omic; fuse
+  streams. Apply it on top of every capability skill below.
+
+
+================================================================
+FILE: skills/genome/SKILL.md
+================================================================
+
+---
+name: genome
+description: DNA analysis from the user's own genome — imputed on-device (Beagle), annotated in-house (ClinVar P/LP screen, polygenic scores), with a COMPUTED ACMG/AMP classification (not just a ClinVar lookup) and callability honesty. Use for genotype at an rsID, gene variants, APOE/TCF7L2/MTHFR/BRCA, ClinVar significance, carrier-vs-at-risk screen, pharmacogenomics, polygenic scores, and variant pathogenicity classification.
+tools:
+  - variant.resolve
+  - genome.summary
+  - clinvar.findings
+  - acmg.classify
+  - splice.assess
+  - pgs.score
+  - pgx.summary
+  - gwas.associations
+  - ancestry.estimate
+  - genome.impute
+  - genome.annotate
+  - genome.pgx_run
+mutating: false
+---
+
+# Genome
+
+Indaga owns the whole genome pipeline, fully on-device: a consumer chip is **imputed** to a dense
+GRCh38 genome (Beagle + 1000G-30x panel — the genome never leaves the machine), parsed into a
+queryable **Active Genome Index**, and **annotated in-house** — ClinVar significance (position-join),
+a high-penetrance P/LP screen, polygenic scores, and a **computed ACMG/AMP classification**. Nothing
+is borrowed from another project; everything is from the user's own data + Indaga's downloaded references.
+
+## When to use
+Genotype at an rsID; a gene's variants; APOE / TCF7L2 / MTHFR / BRCA etc.; "am I a carrier of X?";
+ClinVar pathogenic findings; **how pathogenic is this variant (ACMG)**; pharmacogenomics; polygenic
+risk percentiles; GWAS trait associations.
+
+## The processing flow (for a new/unprocessed genome)
+1. `indaga.install` — fetch reference libraries (ClinVar, gnomAD, AlphaMissense, panels) into ~/.indaga.
+2. `genome.impute` — extend the chip to a GRCh38 genome. **Long-running → background job**; poll
+   `indaga.check_background_job` until done.
+3. `genome.annotate` — build the index + P/LP screen + polygenic scores (+ GWAS associations).
+4. `genome.pgx_run` *(optional)* — in-house PharmCAT for pharmacogenomics. **Background job** (first run
+   also fetches a reference FASTA); poll, then query `pgx.summary`.
+Then query with the tools below. (On a typical session the genome is already processed; check
+`genome.summary` / `indaga.describe_context` first.)
+
+## The contract — callability is honesty (the core rule)
+**A variant not in the subject's genome (not chip-typed and not confidently imputed) is `not_measured`
+— UNKNOWN, never "you don't have it".** This is the genomic leg of the envelope
+(`requires:[callability, genotype_support]`). E.g. **APOE rs429358 is not on the GSA chip** → "do I
+carry APOE ε4?" is "not measured — unknown", not "no".
+
+| situation | envelope | what to say |
+|---|---|---|
+| variant present (typed/imputed), called | `evidence_present` | genotype + zygosity; ClinVar; the COMPUTED ACMG tier; cite the source |
+| variant not in genome / no-call | `not_measured` + `requires:[callability,…]` | "Not in this genome — unknown, not absent." |
+| common variant flagged 'pathogenic' | `REFUTED` caveat | do NOT alarm — likely false positive (high population frequency) |
+
+`negative_inference.allowed` is `false` unless callability + genotype support are satisfied.
+
+## Tools
+- **`variant.resolve`** (entry) — `{"rsid":"rs7903146"}` → genotype + zygosity, ClinVar significance,
+  callability, AlphaMissense + **REVEL** (a second ensemble missense opinion, with AlphaMissense
+  concordance), and a **computed ACMG/AMP tier** (vs ClinVar). Writes the variant into the Active Health
+  Index so it fuses with labs/CGM.
+- **`acmg.classify`** (focused) — the ACMG/AMP call for a variant: **PVS1** (LoF in a constrained or
+  established LoF-disease gene) + **PM2/BA1/BS1** (frequency) + **PP3/BP4** (AlphaMissense; REVEL fills in
+  where AM doesn't cover), combined per Richards 2015 → Pathogenic / Likely-pathogenic / VUS /
+  Likely-benign / Benign, with the criteria that fired and ClinVar concordance. Indaga COMPUTES this; it
+  is not a lookup. **PVS1 fires on NOVEL variants too** — an owned MANE-transcript consequence annotator
+  (genome/consequence.py) calls nonsense/frameshift/splice on any variant, so a LoF ClinVar has never seen
+  still classifies (the differentiator vs Genomi/OpenCRAVAT, which can only look ClinVar up). Still not
+  computed: PS1/PM5/segregation/functional → most novel missense correctly land at VUS.
+- **`splice.assess`** (focused) — **SpliceAI** splice-impact prediction for a variant: delta scores
+  (acceptor/donor × gain/loss, 0–1; `ds_max` = splice-altering probability, ≥0.5 likely, ≥0.8
+  high-confidence) + a splice-aware ACMG tier. Catches splice-altering variants AlphaMissense (missense-only)
+  and the canonical ±1/2 rule both miss — deep-intronic cryptic sites, exonic-splice, even synonymous.
+  Indaga runs the model **on-device** (no 30 GB precomputed download). **SLOW (a TensorFlow cold start,
+  ~15 s)** → call when splicing is the question, not for every variant; `variant.resolve` does NOT run it.
+- **`clinvar.findings`** (focused) — the carried P/LP screen, tiered honestly: `confident_at_risk` vs
+  `needs_confirmation` (imputed-not-in-gnomAD, or 1★ single-submitter ClinVar) vs `carrier_only`
+  (recessive heterozygote — family-planning relevance, NOT personal risk) vs common-refuted. Includes
+  AlphaMissense-pathogenic missense candidates ClinVar doesn't flag. Lead with `confident_at_risk`.
+- **`pgs.score`** (focused) — polygenic percentiles (imputed). **Read `confidence`/`coverage`**: a
+  'low' (<50% of variants recovered) score regresses toward 50th and UNDERSTATES risk — coverage-limited,
+  not a true low score. Directional, not a diagnosis.
+- **`pgx.summary`** (focused) — pharmacogenomic diplotypes computed **in-house** (PharmCAT CPIC
+  star-alleles on the imputed genome): per-gene `diplotype` + `phenotype` (e.g. NAT2 \*6/\*6 Poor
+  Metabolizer; RYR1 c.6178G>T → Uncertain Susceptibility = the malignant-hyperthermia flag) +
+  `activity_score`. `blind_spots` lists genes imputation can't confidently resolve (CYP2D6/CYP2C19/HLA
+  — for drugs they govern, a clinical PGx panel is needed before prescribing). Run with `genome.pgx_run`
+  (background) first; until then it reports `not_measured`.
+- **`ancestry.estimate`** (focused) — most likely continental superpopulation (1000G AFR/AMR/EAS/EUR/SAS)
+  by ancestry-informative-marker (AIM) likelihood against the imputation panel's per-population allele
+  frequencies. Returns `assigned_superpopulation` + `confidence` + per-pop `proportions` (normalized
+  likelihoods). This is continental **assignment, NOT admixture-fraction deconvolution** (that needs
+  ADMIXTURE/RFMix) — don't report the proportions as genome ancestry fractions, and it doesn't capture
+  recent admixture or self-identified identity. Builds its AIM reference once (background) on first use.
+- **`gwas.associations`** (focused) — GWAS-Catalog trait/disease associations at loci the subject
+  carries, ranked by **−log10(p)** (`neg_log10_p`; the raw `pval` underflows float64 to 0 for the most
+  significant hits, so it is display-only). Position-joins the GRCh38 catalog against the imputed AGI
+  (a GRCh37-only chip won't match — reports `not_measured`). Filter by `trait`. **Association ≠ causation**;
+  effect sizes (OR/beta) are population-level and small for common variants; an empty trait search is
+  `not_observed_in_consulted_scope` (the catalog is trait-curated + incomplete), never a clean negative.
+- **`genome.summary`** (entry) — index stats + what's available. **`genome.impute`/`genome.annotate`**
+  (focused, mutating) — run the pipeline (see flow above).
+
+## Interpretation
+> Follow `skills/output-rules.md` (the delivery contract) on top of these — esp. *a predictor
+> score is never a diagnosis*, *exact-allele match before you alarm*, and *translate the vocabulary*.
+- Lead with the genotype + the COMPUTED ACMG tier; show it next to ClinVar (agreement is reassuring;
+  divergence is informative). A common variant is ACMG-Benign (BA1) regardless of a high predictor score.
+- ACMG = **Mendelian pathogenicity**, distinct from **polygenic risk**: a common T2D risk allele is
+  ACMG-Benign *and* a PGS signal — different lenses, both valid.
+- `needs_confirmation` findings (imputed rare, or weak ClinVar review) want orthogonal confirmation
+  (Sanger/clinical) before acting — say so; don't assert.
+- Pair genetic risk with the user's actual labs/CGM when relevant (TCF7L2 × real glucose) — the moat.
+- Everything here is decision-support, not diagnosis; recommend clinician review for medical decisions.
+
+
+================================================================
+FILE: skills/domains/SKILL.md
+================================================================
+
+---
+name: domains
+description: Genome-domain lenses — the user's variants in a curated gene panel for a wellness domain (methylation, hormones, immunity, gut, skin, sleep, longevity, athletic, mood/focus, senses, hereditary-cancer, metabolic, cardiovascular). Use for "my methylation genes", "my detox/COMT", "hormone genetics", "skin/aging genes", "athletic/muscle genes", or any domain-scoped DNA question.
+tools:
+  - domains.list
+  - domains.get
+mutating: false
+---
+
+# Domains — genome lenses per wellness area
+
+Each domain is a curated gene panel + the subject's annotated variants in it + the relevant labs +
+recommended missing tests (computed on imputed data). Use these for domain-scoped DNA questions;
+use `genome.variant.resolve` for a single rsID and `synthesis` to fuse a domain's DNA with labs/CGM.
+
+## Tools
+
+- **`domains.list`** (entry) — the available lenses with panel + variant counts.
+- **`domains.get`** (entry) — `{"domain": "methylation"}` → the panel genes, the subject's variants
+  (rsID, gene, ClinVar significance, AlphaMissense, and the genotype from the chip), the relevant
+  labs, and recommended missing tests.
+
+## How to answer
+
+> Apply `skills/output-rules.md` (the delivery contract) — esp. *suppress the benign dump*,
+> *a predictor `am_class` is never a diagnosis* (MTHFR C677T is common → not pathogenic), and *fuse
+> the genetics with measured labs*.
+- **Lead with the *notable* variants** (`notable_variants`), not the long benign list — most ClinVar
+  rows in a panel are benign/common and should not alarm.
+- A "risk factor"/"susceptibility"/"uncertain" class is association, not a diagnosis.
+- **Pair the genetics with the user's measured labs** in the same bundle (e.g. methylation genes ×
+  homocysteine/folate; hormone genes × the hormone panel; iron genes × ferritin) — and flag the
+  `missing_tests_recommended` when the relevant lab is absent. That pairing is the point.
+- Carrier/pathogenic and hereditary-cancer findings are decision-support — recommend clinical genetics review.
+
+
+================================================================
+FILE: skills/nutrigenomics/SKILL.md
+================================================================
+
+---
+name: nutrigenomics
+description: Interpreted food & nutrient genetics from the chip — lactose tolerance, caffeine + alcohol metabolism, folate (MTHFR), vitamin B12/A, iron (HFE), appetite (FTO), bitter taste. Use for "can I digest dairy", "am I a fast/slow caffeine metabolizer", "alcohol flush", "MTHFR/folate", "iron genes", "why do I crave / taste X". Refuses diet prescriptions and supplement dosing.
+tools:
+  - nutrigenomics.markers
+mutating: false
+---
+
+# Nutrigenomics — interpreted single-marker food/nutrient genetics
+
+> Apply `skills/output-rules.md` (the delivery contract): single-marker effects are modest — never a
+> diagnosis or a prescription; an `am_class` on a common variant (MTHFR C677T) is not pathogenic.
+
+Resolves a curated nutrigenetic panel from the Active Genome Index and gives each genotype a
+plain-English meaning (the interpreted layer the domain bundles don't provide).
+
+## The contract — modest, probabilistic, never a prescription
+
+Single-marker nutrigenetic effects are **modest and probabilistic**, not deterministic. Stay in scope:
+**no diet prescriptions, no supplement dosing, no weight-loss prediction.** A marker not on the chip is
+`not_measured` (unknown), never "you're fine". Always pair with the user's **actual labs** — the genotype
+suggests a tendency; the lab measures reality (e.g. HFE iron genes × ferritin; MTHFR × homocysteine).
+
+## Tool
+
+- **`nutrigenomics.markers`** (entry) — all interpreted markers (or filter by `category`:
+  food-tolerance / nutrient-metabolism / eating-behavior / taste / sensitivity). Returns genotype,
+  effect-allele count, and the interpretation per marker, plus which markers weren't on the chip.
+
+## How to answer
+
+- State the trait + the user's genotype + what it means (e.g. "CYP1A2 — you carry the slow-metabolizer
+  genotype, so caffeine lingers; consider an earlier cut-off").
+- Pair with labs/measured data where relevant; recommend the measurement when it's missing.
+- Keep it directional and non-prescriptive; suggest clinician/dietitian review for anything actionable.
+
+
+================================================================
+FILE: skills/circadian/SKILL.md
+================================================================
+
+---
+name: circadian
+description: The Biological Clock — the user's Biological Midnight (heart-rate nadir) computed by a validated 24-hour cosinor, with honest calibration gating. Use for "when is my biological midnight", "my body clock", HR nadir, circadian phase, light/meal/sleep timing anchored to the nadir.
+tools:
+  - clock.state
+  - clock.biological_midnight
+mutating: false
+---
+
+# Circadian — the Biological Clock
+
+> Apply `skills/output-rules.md` (the delivery contract): a calibrating metric (<14 valid nights) has
+> no value to state — say it's calibrating, don't quote a midnight.
+
+Computes the **Biological Midnight** (the trough of the daily heart-rate rhythm) from the
+wearable HR series via the All-of-Us / npj Digital Medicine 2025 full-24-hour cosinor. This
+is the validated method — never estimate the nadir as "the lowest heart rate of the night".
+
+## When to use
+
+The user asks about their Biological Midnight, HR nadir, circadian phase, body clock,
+chronotype-from-heart-rate, or when to time light / meals / wind-down.
+
+## The contract — calibration is honesty
+
+A Biological Midnight is only real after **≥14 valid sleep/HR nights**. The state machine:
+
+| state | meaning | envelope |
+|---|---|---|
+| `real` | ≥14 nights, good cosinor fit (R²≥0.4), fresh | `evidence_present` / `answer_supported` — state the Midnight |
+| `low_quality` | ≥14 nights but weak fit | `evidence_present` / `scoped_answer_only` — provisional |
+| `stale` | good fit but data old | `evidence_present` / `scoped_answer_only` |
+| `calibrating` | <14 valid nights | `index_incomplete` / `needs_more_data` — **do NOT state a Midnight**; report progress |
+| `empty` | no HR data | `index_incomplete` — no clock yet |
+
+`calibrating` is the wearable analogue of genomic callability: not enough signal to claim the
+phase yet. `negative_inference.allowed` is always `false` for the clock.
+
+## Tools
+
+- **`clock.state`** (entry) — the full state: `state`, `valid_nights`, and the Biological
+  Midnight *only when calibrated*. Start here.
+- **`clock.biological_midnight`** (focused) — just the clock time, returned only when the
+  clock is `real`/calibrated; otherwise the calibration state with the value withheld.
+
+## Interpretation
+
+- When `real`: state the Midnight (e.g. "≈03:46"), and anchor timing advice to it — morning
+  light shortly after the nadir, dim light ~2-3 h before the user's habitual sleep, etc.
+- When `calibrating`: say how many of 14 nights are in, and that the Midnight will appear once
+  enough valid nights accumulate. Never invent a time.
+- The Midnight is a wearable-derived proxy for circadian phase, not a clinical measurement.
+
+
+================================================================
+FILE: skills/labs/SKILL.md
+================================================================
+
+---
+name: labs
+description: Blood-lab analytes from the user's Active Health Index, with the measurement-present honesty rule — an analyte that was never measured returns "not measured" (unknown), never a false "normal". Use for cholesterol/LDL/HDL, triglycerides, ApoB, HbA1c, glucose, and "what's my <lab>", "is my <lab> normal", "what labs am I missing".
+tools:
+  - labs.query
+  - labs.panel_coverage
+mutating: false
+---
+
+# Labs
+
+> Apply `skills/output-rules.md` (the delivery contract): *"measured & normal" ≠ "never measured"*;
+> absence is per-omic; a stale value is not a current one.
+
+Answers lab questions from the subject's stored, LOINC-coded, provenance-stamped lab facts.
+
+## When to use
+
+The user asks about a blood lab (LDL, ApoB, HbA1c, triglycerides, …), whether a lab is
+normal, trends, or which labs they're missing.
+
+## The contract — "measured & normal" ≠ "never measured"
+
+This is the lab analogue of genomic callability. If an analyte has **no fact** in the index,
+the answer is `not_measured` — **absence is UNKNOWN, not normal.** Never tell the user a lab
+is fine when it was simply never drawn.
+
+| situation | envelope | what to say |
+|---|---|---|
+| analyte present, Grade A/B | `evidence_present` / `answer_supported` | state the value + flag (high/normal), cite the draw |
+| analyte present, low grade | `evidence_present` / `scoped_answer_only` | report it, qualified |
+| analyte never measured | `not_measured` / `needs_more_data` | "X was never measured — unknown, not normal. Consider ordering it." |
+
+`negative_inference.allowed` is `false`: zero results never means "you don't have a problem".
+
+## Tools
+
+- **`labs.query`** (entry) — one analyte (`{"analyte": "apob"}`) or all labs. A missing analyte
+  returns `not_measured`. With no analyte, returns the lab panel (use `flagged_only` for abnormals).
+- **`labs.panel_coverage`** (focused) — which analytes of a panel are present vs never measured.
+  Use to answer "what should I add to my next blood test?" honestly. (v1 uses a default
+  cardiometabolic panel; a full LOINC panel map is a later refinement.)
+
+## Interpretation
+
+- Lead with the measured value and its flag; cite the source draw (provenance is available via
+  `provenance.resolve`).
+- For a missing analyte, recommend ordering it rather than reassuring — and never substitute a
+  related lab as if it were the asked-for one.
+- Keep clinical language informational; recommend clinician review for medical decisions.
+
+
+================================================================
+FILE: skills/metabolic/SKILL.md
+================================================================
+
+---
+name: metabolic
+description: CGM / glucose summaries (GMI, time-in-range) from the user's Active Health Index, with the freshness honesty rule — stale sensor data cannot be claimed as current glucose control. Use for glucose, CGM, Dexcom, GMI / estimated A1c, time-in-range, "how's my blood sugar", "my latest CGM".
+tools:
+  - cgm.glycemic_summary
+mutating: false
+---
+
+# Metabolic — CGM glycemic summary
+
+> Apply `skills/output-rules.md` (the delivery contract): stale CGM is *not measured*, never
+> "normal" — freshness gates the answer.
+
+Summarizes continuous-glucose data (estimated GMI, time-in-range) from the subject's index.
+
+## When to use
+
+The user asks about glucose, CGM/Dexcom, GMI / estimated A1c, time-in-range, glycemic
+variability, or "how is my blood sugar".
+
+## The contract — freshness is honesty
+
+A glucose summary is only about the *current* user if the sensor data is recent. If the last
+CGM reading is stale (older than its useful window), Indaga returns `not_measured` for
+*current* glucose with `requires: [freshness]` — **an old sensor read is not your present
+control.** The historical summary is surfaced as context, never as a current claim.
+
+| situation | envelope | what to say |
+|---|---|---|
+| recent per-reading series | `evidence_present` (grade from days of wear) | state GMI / TIR, cite the wear window |
+| only a session summary, fresh | `evidence_present` / `scoped_answer_only` | report counts; full GMI needs the per-reading series |
+| sensor data stale (e.g. >90 days) | `not_measured` + `requires:[freshness]` | "Your CGM data is N days old — current glucose control is unknown, not normal." |
+| no CGM at all | `not_measured` | never collected |
+
+`negative_inference.allowed` is `false`.
+
+## Tools
+
+- **`cgm.glycemic_summary`** (entry) — GMI / TIR when fresh per-reading data exists; otherwise
+  an honest freshness/summary state. Reads the glucose series or the CGM session summary fact.
+
+## Interpretation
+
+- When fresh: lead with GMI (and its prediabetes/normal band) and time-in-range; name the wear window.
+- When stale: say plainly that the data is old and you can't claim current control; offer the
+  historical context and suggest a fresh CGM stint if they want a current read.
+- GMI is an estimate (Bergenstal 2018: 3.31 + 0.02392 × mean glucose mg/dL), not a lab A1c.
+
+
+================================================================
+FILE: skills/health-index/SKILL.md
+================================================================
+
+---
+name: health-index
+description: General access to the user's Active Health Index — structured facts (labs/genomic/derived), high-frequency timeseries (HR, glucose), the AI context pack, provenance, connected sources, and the corrections ledger. Use for cross-domain queries, "what data do I have", "where did this number come from", or to assemble context for synthesis.
+tools:
+  - facts.query
+  - sources.list
+  - context_pack.get
+  - timeseries.get
+  - provenance.resolve
+  - corrections.list
+mutating: false
+---
+
+# Health-index — the queryable Active Health Index
+
+> Apply `skills/output-rules.md` (the delivery contract): translate the vocabulary; absence is
+> per-omic; never present a raw fact as a clinical conclusion.
+
+The general-purpose query surface over the subject's multi-omic facts, timeseries, and
+provenance. Prefer the domain capabilities (labs, circadian, metabolic) for domain questions;
+use these for cross-domain access, provenance, and context assembly.
+
+## Tools
+
+- **`facts.query`** (entry) — structured facts with filters (`names`, `domains`, `flagged_only`,
+  `min_evidence`, `limit`). Every fact is graded + caveat-wrapped; the envelope tells you whether
+  the set supports a claim.
+- **`sources.list`** (entry) — connected data sources + freshness ("what data do I have?").
+- **`context_pack.get`** (entry) — the self-describing, source-backed pack (profile + facts +
+  timeseries summaries + flagged + corrections + caveats + an evidence manifest). The right input
+  for multi-domain synthesis.
+- **`timeseries.get`** (focused) — a high-frequency series (`heart_rate_bpm`, `glucose_mgdl`)
+  with summary stats; `include_points` for the raw series (large).
+- **`provenance.resolve`** (focused) — where a `fact_id` came from (source file + locator). Use to
+  cite a value precisely.
+- **`corrections.list`** (focused) — superseded values and why (e.g. a chip-only score corrected by
+  imputation). A corrected value must never be re-stated as current.
+
+## The contract
+
+Same envelope rules as everywhere: `evidence_present` to claim, `not_measured` /
+`not_observed_in_consulted_scope` mean unknown not normal, `negative_inference.allowed` is
+almost always `false`. Cite facts by `fact_id`; resolve provenance when a claim is load-bearing.
+
+
+================================================================
+FILE: skills/synthesis/SKILL.md
+================================================================
+
+---
+name: synthesis
+description: Multi-omic synthesis — fuse the user's DNA, labs, polygenic scores, and CGM/wearable data for one topic into a single grounded answer (e.g. "my diabetes risk" = TCF7L2 genotype × T2D polygenic score × CGM × glucose labs). Use whenever a question spans modalities, or asks for the "big picture", "overall risk", or "what does all my data say about X".
+tools:
+  - synthesis.multi_omic_question
+mutating: false
+---
+
+# Synthesis — the multi-omic fusion
+
+> Apply `skills/output-rules.md` (the delivery contract): *fuse, don't silo* — name what each stream
+> contributes and pair genetics with the user's measured values.
+
+This is what makes Indaga more than a genome agent: it answers a question by combining ALL of the
+user's modalities at once, grounded and caveated. A genomics-only or labs-only tool sees one slice;
+synthesis sees the convergence.
+
+## When to use
+
+The question spans modalities or asks for the whole picture: "what's my diabetes risk?", "should I
+worry about my heart?", "what does all my data say about my metabolism?", "overall, what stands out?".
+
+## Tool
+
+- **`synthesis.multi_omic_question`** (entry) — `{"topic": "diabetes"}` → a fused pack:
+  - `dna` — relevant genotypes (resolved from the Active Genome Index, with ClinVar),
+  - `labs` — relevant lab facts,
+  - `polygenic_scores` — relevant PGS percentiles,
+  - `timeseries` / `derived` — relevant CGM / wearable / circadian metrics,
+  - `synthesis_guidance` + an `evidence_envelope`.
+  Known topics (diabetes, cardiovascular, methylation) pull the right variants/labs/scores; any other
+  topic falls back to keyword matching.
+
+## How to answer
+
+1. **Lead with the convergent picture.** Say where the modalities AGREE (e.g. "your TCF7L2 risk
+   genotype AND a 90th-percentile T2D polygenic score AND your CGM all point the same way").
+2. **Name divergence and gaps honestly.** Where modalities disagree, or data is missing/stale, say so
+   — a stale CGM can't speak to current control; a not-on-chip variant is unknown; a normal lab is
+   reassuring only for what was measured.
+3. **Never convert a genotype or percentile into a diagnosis.** PGS is population-relative and
+   directional; a risk allele is association, not destiny. Pair genetics with the user's ACTUAL
+   measured biology — that pairing is the whole point.
+4. Decision-support, to be reviewed with a clinician.
+
+
+================================================================
+FILE: skills/analyze/SKILL.md
+================================================================
+
+---
+name: analyze
+description: The user's whole multi-omic picture in one place — a structured, evidence-graded report fusing the genome engine (ClinVar/ACMG/PGS/PGx/GWAS/ancestry/nutrigenomics + domain lenses) with labs, circadian, and CGM. Use to summarise everything Indaga knows about a person, or to produce a shareable HTML report. Every section carries its own honesty grade; not-yet-computed sources degrade honestly, never blank.
+tools:
+  - analyze.report
+  - analyze.export
+mutating: false
+---
+
+# Analyze
+
+> Apply `skills/output-rules.md` (the delivery contract): lead with the few real findings and
+> *suppress the benign/candidate dumps*; a `confirmed_rare` candidate is not a diagnosis; exact-allele
+> match before you alarm.
+
+`analyze` is Indaga's **synthesis surface** — it turns everything the engine computes into one
+honest, evidence-graded picture. It does not re-derive anything: it CALLS the other capabilities'
+handlers (genome + multi-omic) and assembles their results, each with its evidence envelope intact.
+It is **read-only** — it reports what's already computed and never triggers imputation, annotation,
+PharmCAT, ancestry builds, or the slow SpliceAI.
+
+## When to use
+"Summarise my health / my genome", "give me the full picture", "what does my data say overall",
+"make me a report I can open / share with my doctor", "what should I act on first".
+
+## The two tools
+- **`analyze.report`** (entry) — the whole picture as **structured, graded sections**:
+  `{sections:[{key, title, tier, summary, findings, evidence_envelope}], …}`. Agent-native — YOU
+  narrate from it. One section per area: overview · hereditary cancer · polygenic scores ·
+  pharmacogenomics · GWAS · ancestry · nutrigenomics · the genome domain lenses (cardio, methylation,
+  metabolic, athletic, gut, immunity, hormones, skin, senses, mood, longevity, sleep, …) · blood
+  panel · circadian · CGM.
+- **`analyze.export`** (focused, mutating) — writes a **single self-contained, offline `report.html`**
+  (dark/light, EN/RU/NL chrome, inlined Chart.js, citations) to `~/.indaga/<subject>/reports/` and
+  returns the path. `{"lang":"en|ru|nl"}` picks the UI language. Open it in any browser, fully offline.
+
+## The contract — read each section's envelope (the core rule)
+**Every section carries its own `evidence_envelope`. Read it before you state that section's
+finding.** The report maps the envelope to a visual `tier`, but the envelope is the source of truth:
+- `evidence_present` → state the finding (tier ok/info/watch/alert by its own interpretation).
+- `not_measured` / `not_observed_in_consulted_scope` → tier `neutral`; the data isn't there. **This is
+  UNKNOWN, never "normal"/"no risk"** — surface it as "not measured — order/connect X", don't skip it.
+- `index_incomplete` → tier `info`; the metric is still calibrating (e.g. Biological Midnight before
+  14 nights) — say it's calibrating, don't state a value.
+A genome-only subject (no labs/CGM/wearable) still gets a full report — the genome sections are rich
+and the multi-omic sections degrade honestly to `neutral` with a next action. Lead with the rich,
+confident sections (the genome depth); never imply a `neutral` section is a clean negative.
+
+## Interpretation
+- Lead with the **Overview** (headline at-risk findings + priority actions + top PGS + PGx alerts +
+  ancestry), then go deep where the user asks.
+- Pair genetics with the user's measured labs/CGM when both exist (the multi-omic moat) — e.g. the
+  metabolic/cardio sections fuse PGS + TCF7L2/lipid genetics with the actual lipid/glucose labs.
+- PGS percentiles are directional + population-relative; a `low` confidence means coverage-limited
+  (understated), not a true low score. ACMG/ClinVar findings are Mendelian, distinct from PGS.
+- `analyze` is decision-support, not diagnosis — recommend clinician review for clinical decisions.
+
+
+================================================================
+FILE: skills/output-rules.md
+================================================================
+
+# Output Rules — the delivery half of Indaga's honesty contract
+
+Cross-cutting rules for **every** Indaga answer, in any capability. `conventions/evidence-envelope.md`
+defines what an answer may *claim* (the **data** contract); this defines how to *render* it (the
+**delivery** contract). Together they are why "the honesty is the product." When delivery and evidence
+conflict, evidence wins — style never loosens a scope, a confidence judgment, or a
+clinical-confirmation note.
+
+## 1. Lead with the meaning
+Open with the answer in plain language. Put tool names, file paths, SQLite/VCF mechanics, `DR2`, and
+provenance *after* the meaning — and only when they change what the user should do. Never open with a
+status line about which index was read or that no genome was used.
+
+## 2. The envelope gates the words — read it first
+- `evidence_present / answer_supported` → state the finding, cite the fact.
+- `evidence_present / scoped_answer_only` → state it, but only inside the stated scope.
+- `not_measured` / `not_observed_in_consulted_scope` → **say it is unknown / not measured. Never
+  "you don't have it" or "your X is normal."** Absence is a negative only when
+  `negative_inference.allowed` is true (it almost never is).
+- `index_incomplete / needs_more_data` → the metric is calibrating (e.g. a Biological Midnight before
+  14 valid nights); explain that, do not state a value.
+Derive confidence from the envelope at answer time — never a fixed default.
+
+## 3. A predictor score is not a finding
+`am_class` (AlphaMissense), `revel`, SpliceAI Δ, `acmg_tier`, and PGS percentiles are a **model's
+opinion**, not a result. Therefore:
+- **Never present a common variant's predictor score as pathogenic.** A high `am_class` on a common
+  polymorphism (e.g. MTHFR C677T, ~30% of Europeans) is a known predictor failure, not a finding. If
+  ClinVar says `drug response` / `benign`, or the allele is common, the predictor does not override
+  that.
+- Render ACMG / AlphaMissense / SpliceAI as "in-silico prediction — needs clinical confirmation",
+  never as a diagnosis.
+- A PGS percentile is directional, population-relative, and coverage-gated. A `low` confidence /
+  low-coverage score is **understated**, not a true low score — say so; do not quote the literal
+  percentile as a risk number.
+
+## 4. Lead with the few real ones; suppress the dumps
+A gene panel or genome-wide screen is mostly benign/common by construction. Lead with the 1–3
+genuinely notable, honestly-graded findings. Do not surface the full benign list, raw candidate
+inventories, or a screening **count** as a headline — "31 candidates" is a triage input, not an
+answer.
+
+## 5. Match exactly before you alarm
+Attach a clinical significance only when the subject's genotype is the *same variant* — normalized
+`(build, chrom, pos, ref, alt)` — not merely the same position. A pathogenic indel that shares one
+base with a common SNP is a position collision, not a carrier. Imputation cannot call repeat
+expansions, large deletions, or structural variants; never present one as carried.
+
+## 6. Say where the genotype came from (translate the vocabulary)
+- "directly measured on your chip" before `directly_typed=1` / grade A.
+- "statistically inferred (imputed)" before an imputed call; "imputation confidence" before `DR2`.
+- "one copy has this change" before heterozygous / `0|1`; "both copies" before homozygous / `1|1`.
+- "a public registry of clinician-submitted variant interpretations" before `ClinVar`.
+- "screening-grade — confirm with a clinical test" before any imputed P/LP or carrier result.
+
+## 7. Absence honesty is per-omic
+"Not measured" is *unknown* for every stream, each gated on its own requirement: genome → callability
++ typed-vs-imputed; labs → measurement present + not stale; CGM → sensor freshness; wearables →
+enough coverage (e.g. nights for a chronotype). Never say "your X is normal/fine" for a stream that is
+uncalled, unmeasured, stale, or still calibrating.
+
+## 8. Fuse, don't silo (Indaga's edge)
+When a question touches more than one stream, combine them and say what each contributes. Pair
+genetics with the user's *measured* values whenever both exist — MTHFR × homocysteine, a lipid PGS ×
+the actual LDL, TCF7L2 × the actual glucose. A single-stream answer that ignores an available
+contributing stream is incomplete.
+
+## 9. Decision support, not diagnosis · n=1
+Keep clinical language informational; recommend a clinician for medical decisions. Every answer is
+hard-scoped to one subject — never mix people's data. Name the data that shaped the answer (the lab
+draw, the date range, the typed-vs-imputed status) when it materially affects the result. That naming
+*is* the product.
+
+
+================================================================
+FILE: skills/conventions/evidence-envelope.md
+================================================================
+
+# Convention — the evidence envelope
+
+Every Indaga-agent capability result carries one `evidence_envelope`. It is the single source of
+truth for how strong the answer is. Read it before you answer; never invent a parallel verdict in prose.
+
+## Fields
+
+- `finding_state` — what was found:
+  - `evidence_present` — at least one decision-grade fact in scope.
+  - `not_observed_in_consulted_scope` — looked, found nothing in scope (NOT a negative).
+  - `not_measured` — the analyte/metric was never collected, or the sensor data is stale (UNKNOWN).
+  - `index_incomplete` — a derived metric is still calibrating (e.g. Biological Midnight < 14 nights),
+    or a genomic index is still building.
+  - `blocked_missing_library` — a reference library needed to answer isn't installed.
+  - `not_assessed` — could not assess (missing inputs / scope mismatch).
+  - `true_negative_supported` — a genuine "you don't have this", with its requirements satisfied.
+- `answer_readiness` — `answer_supported` · `scoped_answer_only` · `cannot_answer_yet` ·
+  `needs_user_install` · `needs_index_build` · `needs_more_data` · `needs_clinical_confirmation`.
+- `negative_inference` — `{allowed, requires[], satisfied[]}`. **`allowed` is almost always false.**
+  Only state "you don't have X" / "your X is normal" when an envelope explicitly allows it.
+  Requirement tokens: `callability`, `genotype_support`, `library_coverage` (genomic);
+  `measurement_present`, `panel_alignment`, `calibrated`, `freshness` (multi-omic); `scope_alignment`,
+  `clinical_confirmation`.
+- `coverage`, `observations`, `next_actions`, `guidance` (typed codes), `notes`.
+
+## How to answer per state
+
+| finding_state / answer_readiness | what you may say |
+|---|---|
+| evidence_present / answer_supported | State the finding; cite the fact_id / source. |
+| evidence_present / scoped_answer_only | Answer, but only within the stated scope; qualify it. |
+| index_incomplete / needs_more_data | Do NOT state the value. Explain it's calibrating + the progress. |
+| not_measured / needs_more_data | "X is not measured — unknown, not normal." Suggest collecting it. |
+| not_observed_in_consulted_scope | Nothing matched in scope; do not imply a clinical negative. |
+| not_assessed / cannot_answer_yet | Ask for the missing input or use another capability. |
+| true_negative_supported | A real negative — state it with its scope. |
+
+The honesty IS the product. A confident wrong "your X is fine" is the failure mode this contract exists to prevent.

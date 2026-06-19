@@ -1,0 +1,46 @@
+# ─── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ─── virtualenvs ──────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ─── OS / editor ──────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+*.swp
+
+# ─── local dev log (real per-subject findings — keep local, never share) ──
+STATUS.md
+
+# ─── PERSONAL / RUNTIME DATA — must NEVER be committed ────────────────────
+# Reference libraries + per-subject genomes/health data live in ~/.indaga
+# (outside the repo). These patterns are defensive in case anything is ever
+# created inside the working tree. The repo ships ZERO personal data.
+/.indaga/
+users/
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.health-index.sqlite
+*.vcf
+*.vcf.gz
+*.bcf
+*.bam
+*.cram
+*.fastq
+*.fastq.gz
+*.gvcf
+*.gvcf.gz
+report*.html

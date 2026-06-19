@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indaga-agent"
+version = "0.1.0"
+description = "Local-first, multi-omic personal-health agent runtime — the agent backend for Indaga."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+  "numpy>=1.26",   # 24-hour cosinor (Biological Clock)
+  "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+# imputation (chip → GRCh38): pyliftover does the GRCh37→38 coordinate lift. The heavy lifters
+# (Beagle JAR + 1000G panel) are fetched by `indaga install`/`indaga impute`; bcftools/bgzip/tabix
+# + a Java 17 runtime must be on PATH (e.g. `micromamba install -c bioconda bcftools htslib openjdk`,
+# or Homebrew/apt). See the "Bring your own genome" section below.
+impute = ["pyliftover>=0.4"]
+# observability: when installed AND INDAGA_OTEL=1, operation spans are forwarded to an OTel exporter;
+# otherwise spans are still emitted to the in-process ring + per-subject traces.jsonl (no hard dep).
+otel = ["opentelemetry-sdk>=1.20"]
+
+[project.scripts]
+indaga = "indaga.interfaces.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# import the package from src/ without an editable install; integration tests (built subject + the
+# 3 GB reference DB) are marked and excluded from CI via `-m "not integration"`.
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["integration: needs a built subject + reference data (run locally, not in CI)"]
+# the `pytest -W error` bar (real warnings — deprecations, etc. — fail the build), EXCEPT the benign
+# sqlite "unclosed database" ResourceWarning that gc emits for the short-lived eval temp DBs.
+filterwarnings = [
+  "error",
+  "ignore::ResourceWarning",
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 110
+extend-exclude = ["**/report_kit/assets/**"]
+
+[tool.ruff.lint]
+# conservative ruleset for the unit gate: pyflakes (F) + a few correctness-oriented bugbear checks.
+select = ["F", "B006", "B008", "B017"]
