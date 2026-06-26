@@ -17,6 +17,7 @@ def load_all() -> None:
     from ..capabilities import (  # noqa: F401 — import side effects register the ops
         analyze,
         clock,
+        decision,
         domains,
         genome,
         grounding,

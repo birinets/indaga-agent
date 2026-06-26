@@ -15,6 +15,7 @@ from datetime import date
 from datetime import datetime, timezone
 
 from ..capabilities.clock import _clock_state
+from ..capabilities.decision import _decision_today
 from ..capabilities.labs import _labs_panel_coverage
 from ..capabilities.metabolic import _cgm_glycemic_summary
 from ..evidence import envelope as E
@@ -128,6 +129,30 @@ def run() -> list[tuple[str, bool, str]]:
         fe["finding_state"] == E.NOT_MEASURED and "freshness" in fe["negative_inference"]["requires"]
         and not fe["negative_inference"]["allowed"],
         f"{fe['finding_state']} requires={fe['negative_inference']['requires']}",
+    ))
+
+    # 8. DECISION eligible (calibrated clock) -> a chrono-metabolic action whose chip is the weakest
+    #    REQUIRED leg (the clock's evidence_present/answer_supported); enriching CGM absence must NOT gate it.
+    de = _decision_today({}, _clock_ctx(20))
+    dec, dee = de["decision"], de["evidence_envelope"]
+    out.append(_check(
+        "decision eligible -> eating_window chosen, envelope = clock's evidence_present/answer_supported, neg-inf disallowed",
+        dec["candidate_id"] == "eating_window_alignment"
+        and dee["finding_state"] == E.EVIDENCE_PRESENT and dee["answer_readiness"] == E.ANSWER_SUPPORTED
+        and not dee["negative_inference"]["allowed"],
+        f"chosen={dec['candidate_id']} {dee['finding_state']}/{dee['answer_readiness']}",
+    ))
+
+    # 9. DECISION fallback (calibrating clock) -> no action manufactured; envelope mirrors the gating
+    #    leg (index_incomplete/needs_more_data). We never invent urgency on a calibrating signal.
+    df = _decision_today({}, _clock_ctx(5))
+    dfd, dfe = df["decision"], df["evidence_envelope"]
+    out.append(_check(
+        "decision fallback (calibrating) -> candidate_id None, envelope index_incomplete/needs_more_data, neg-inf disallowed",
+        dfd["candidate_id"] is None
+        and dfe["finding_state"] == E.INDEX_INCOMPLETE and dfe["answer_readiness"] == E.NEEDS_MORE_DATA
+        and not dfe["negative_inference"]["allowed"],
+        f"chosen={dfd['candidate_id']} {dfe['finding_state']}/{dfe['answer_readiness']}",
     ))
 
     return out

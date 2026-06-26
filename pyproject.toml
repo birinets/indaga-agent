@@ -24,6 +24,10 @@ impute = ["pyliftover>=0.4"]
 # observability: when installed AND INDAGA_OTEL=1, operation spans are forwarded to an OTel exporter;
 # otherwise spans are still emitted to the in-process ring + per-subject traces.jsonl (no hard dep).
 otel = ["opentelemetry-sdk>=1.20"]
+# gateway: the thin local HTTP surface the iOS app talks to (src/indaga_gateway). FastAPI + uvicorn.
+gateway = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
+# narration: OPTIONAL Claude narration for /v1/ask (egress — opt-in via INDAGA_LLM_ENABLED=1 + a key).
+narration = ["anthropic>=0.69"]
 
 [project.scripts]
 indaga = "indaga.interfaces.cli:main"
