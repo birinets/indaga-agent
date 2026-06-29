@@ -22,6 +22,36 @@ def _is_actionable_pgx(phenotype: str | None) -> bool:
     return "normal" not in phenotype.lower()
 
 
+def medications(pool, subject: str) -> dict:
+    """Standalone medication review from the user's genome (PharmCAT diplotypes) — the workflow
+    labs-only apps do from document OCR, Indaga does from DNA. Groups diplotypes into actionable
+    (non-normal phenotype) vs normal, and surfaces the honest blind-spots (genes that can't be called).
+    The pgx.summary envelope passes through verbatim."""
+    try:
+        pgx = pool.dispatch(subject, "pgx.summary")
+    except Exception:
+        pgx = {}
+    diplotypes = pgx.get("diplotypes") or []
+    actionable = [
+        {"gene": d.get("gene"), "diplotype": d.get("diplotype"), "phenotype": d.get("phenotype"),
+         "function": d.get("function"), "coverage": d.get("coverage")}
+        for d in diplotypes if _is_actionable_pgx(d.get("phenotype"))
+    ]
+    normal = [d.get("gene") for d in diplotypes if not _is_actionable_pgx(d.get("phenotype"))]
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "actionable": actionable,
+        "normal_genes": normal,
+        "normal_count": len(normal),
+        "blind_spots": pgx.get("blind_spots", []),
+        "note": pgx.get("note"),
+        "disclaimer": ("Genome-derived pharmacogenomics — decision-support, not a prescription. Confirm "
+                       "with a clinician or pharmacist before any medication change; blind-spot genes "
+                       "cannot be called from this data and may need targeted testing."),
+        "evidence_envelope": pgx.get("evidence_envelope", {}),
+    }
+
+
 def visit_prep(pool, subject: str) -> dict:
     """A clinician-ready summary: today's action, what's worth raising, gaps to order, and
     genome-derived medication flags. Composes decision.today + analyze.report + labs.panel_coverage

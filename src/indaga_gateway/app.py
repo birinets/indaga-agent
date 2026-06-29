@@ -166,6 +166,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         medication flags + PGx blind-spots. The genome/PGx angle is Indaga's edge over labs-only apps."""
         return clinical.visit_prep(pool, subject)
 
+    @app.get("/v1/medications")
+    def medications(subject: str = Depends(require_device)) -> dict:
+        """Medication review from the genome (PharmCAT PGx): actionable diplotypes, normal genes,
+        and honest blind-spots. The DNA-derived angle labs-only apps can't produce."""
+        return clinical.medications(pool, subject)
+
     @app.get("/v1/explain/{analyte}")
     def explain(analyte: str, subject: str = Depends(require_device)) -> dict:
         """Explain one lab result at exactly the envelope's strength (never-measured → 'unknown')."""
